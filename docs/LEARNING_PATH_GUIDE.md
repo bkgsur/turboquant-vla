@@ -130,6 +130,120 @@ These provide context and support your learning:
 
 ---
 
+## 🔬 Foundation Papers Summary
+
+Three seminal papers provide the theoretical foundation for TurboQuant VLA. Below is a concise summary of each and how it relates to your learning path.
+
+### **Paper 1: "Attention Is All You Need" (Vaswani et al., 2017)**
+
+**Why it matters**: Introduces the Transformer architecture—the foundation of all modern VLAs including Octo.
+
+**Key concepts for TurboQuant**:
+- **Self-Attention Mechanism**: How transformers attend to different parts of input
+- **KV Cache in Inference**: During autoregressive decoding, Key-Value caches grow **linearly with sequence length** → this is your primary optimization target
+- **Multi-Head Attention**: 8-16 attention heads per layer; quantization strategy may differ per head
+- **Complexity**: O(n²·d) per layer where n = sequence length, d = hidden dimension
+
+**When to read**: 
+- Step 1: Read abstract + Section 3 (20 mins) for mechanism understanding
+- Step 3: Return for KV cache mechanics when learning about the problem
+
+---
+
+### **Paper 2: "An Image is Worth 16×16 Words" (Dosovitskiy et al., 2021)**
+
+**Why it matters**: Vision Transformer (ViT) is the backbone for vision encoding in Octo and other VLAs.
+
+**Key concepts for TurboQuant**:
+- **Patch Tokenization**: Images split into 16×16 patches → 196-576 tokens per image (vs millions of pixels)
+- **Scalability**: Requires large pretraining datasets (14M-300M images) to outperform CNNs
+- **Architecture Details**: 12 layers, 768 hidden_dim, learned position embeddings
+- **Transfer Learning**: Pretrain on large data → fine-tune to downstream tasks with minimal data
+
+**Relevance to your project**:
+- Octo-small inherits ViT's vision encoding (image patches + language tokens)
+- Sequence grows with: **history frames (2×570 tokens) + language tokens (16) + action tokens = 1156+ tokens per step**
+- Over 10-20 steps of history → KV cache can exceed 4GB on Pi 4B!
+
+**When to read**: 
+- Step 1: Read abstract + Section 3.1 (15 mins) for vision encoding
+- Step 2: Deep dive into architecture when studying Octo's exact structure
+
+---
+
+### **Paper 3: "Octo: An Open-Source Generalist Robot Policy" (Octo Model Team, 2024)**
+
+**Why it matters**: This IS your target model. Octo-small (500M params) is what you'll optimize with TurboQuant.
+
+**Key architecture**:
+- **Input Tokenization**:
+  - Vision: 3rd-person camera (256 tokens) + wrist camera (256 tokens) + language instructions (16 tokens)
+  - Proprioception: Joint positions, velocities (8 tokens)
+  - Total: 2100+ tokens per inference step
+- **Transformer Backbone**: 12-24 layers, ViT-style block-wise masked attention
+- **Action Head**: Diffusion policy for continuous action prediction
+- **Finetuning**: Adapts to new robots in ~5 hours on A5000 GPU with 100 demonstrations
+
+**KV Cache Explosion**:
+- Each attention layer stores K,V: (seq_len × hidden_dim) per head
+- With 2100 tokens × 12 layers × 12 heads → **massive memory footprint**
+- Octo-small: 27M-93M params; Runtime KV cache can be **2-3 GB** with history
+- **Your job**: Compress this to <1 GB using quantization
+
+**When to read**: 
+- Step 2: Focus on architecture (Section III.A) and design decisions
+- Step 3: Return for KV cache growth calculation
+
+---
+
+## 📊 How Papers Connect to Learning Steps
+
+```
+Step 1: VLA Fundamentals
+  └─ Read Attention paper abstract (why transformers work)
+
+Step 2: Octo-Small Architecture
+  └─ Read ViT paper Section 3 (vision encoding)
+  └─ Read Octo paper Section III (exact architecture)
+
+Step 3: KV Cache Problem
+  └─ Return to Attention paper for KV mechanics
+  └─ Calculate memory using Octo's architecture specs
+
+Step 4: TurboQuant Solution
+  └─ Understand residual window: keep recent tokens (FP16),
+     quantize old tokens (INT4)
+
+Step 5: π₀ Model
+  └─ Compare Octo-small vs π₀ quantized (different param counts)
+```
+
+---
+
+## 🎯 Key Insight: Why TurboQuant Matters
+
+| What | Problem | TurboQuant Solution |
+|------|---------|---------------------|
+| **KV Cache Growth** | Grows 2×seq_len×hidden_dim per layer | Keep recent 256 tokens FP16, quantize older tokens INT4 |
+| **Memory on Pi 4B** | Octo needs 2-3 GB just for cache | Target: <1 GB through 3-4× compression |
+| **Inference Speed** | Attention is O(n²) complexity | Quantization reduces cache size → faster operations |
+| **Accuracy** | Quantization loses precision | Residual window keeps important recent context |
+
+**The chain**: Transformers (paper 1) → ViT (paper 2) → Octo (paper 3) → **TurboQuant** (your project)
+
+---
+
+## 📖 When to Read Papers During This Learning Plan
+
+- **Right now (Step 1)**: Read paper abstracts (10 mins total) to understand the motivation
+- **Step 2**: Deep dive into Octo paper Section III (30 mins)
+- **Step 3**: Read Attention paper for KV cache mechanics (40 mins)
+- **Step 4-5**: Return to papers for reference as needed
+
+**Note**: You don't need to read the full papers; focus on sections relevant to KV cache and architecture. Full papers are provided in `/docs/` for reference.
+
+---
+
 ## ✅ Progress Checklist
 
 Track your progress here:
