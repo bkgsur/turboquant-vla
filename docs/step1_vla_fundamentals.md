@@ -38,13 +38,13 @@ Processing:
 └─ Neural network processes image + history
 
 Output:
-└─ Next action: Move arm to position X, Y, Z with grip strength G
+└─ Next action: Move arm to position X, Y, Z OR move mobile base OR control servo angles
 ```
 
-**Why This Matters for Robotics**:
-- Robots need to see (vision) to navigate and pick objects
-- Robots need to remember (history) to plan sequences of actions
-- Robots need to act in real-time (fast inference)
+**Why This Matters for TurboPi Robotics**:
+- **Vision**: TurboPi's HD 2-DOF pan-tilt camera (180° horizontal, 130° vertical) needs to understand what's in the scene
+- **Memory**: TurboPi needs to know what it was doing (moving forward? tracking object? rotating?)
+- **Real-time**: TurboPi must act fast enough for continuous control of 4 mecanum wheels + 2-DOF pan-tilt servos (5-10 Hz)
 
 ---
 
@@ -90,33 +90,33 @@ Action history is a record of what the robot did in previous timesteps. It's imp
 - A single image isn't enough — the robot needs to know what it was doing
 - Actions are sequential — picking an object takes multiple steps
 
-**Example: Pick and Place Task**
+**Example: TurboPi Object Tracking Task**
 
 ```
-Step 1: See empty table
-  Action: Move arm to object location
+Step 1: TurboPi detects object on the ground (via camera)
+  Action: Move base forward
   History: []
 
-Step 2: See arm near object
-  Action: Close gripper around object
-  History: [Move to location]
+Step 2: Object moving left, keep tracking
+  Action: Strafe left with mecanum wheels
+  History: [Move forward]
 
-Step 3: See object in gripper
-  Action: Lift object
-  History: [Move to location, Close gripper]
+Step 3: Object still moving, adjust pan-tilt servos
+  Action: Pan camera left, tilt up
+  History: [Move forward, Strafe left]
 
-Step 4: See object lifted
-  Action: Move to target location
-  History: [Move to location, Close gripper, Lift object]
+Step 4: Object changing position rapidly
+  Action: Rotate TurboPi base while adjusting camera
+  History: [Move forward, Strafe left, Pan camera]
 
-Step 5: See arm at target
-  Action: Open gripper to release
-  History: [Move to location, Close gripper, Lift object, Move to target]
+Step 5: Continue autonomous tracking
+  Action: Combine forward movement + pan servo adjustment
+  History: [Move forward, Strafe left, Pan camera, Rotate base]
 ```
 
 **Why This Explodes Memory**:
 - Each step adds a vector to the history (action embedding)
-- After 30 steps, history has 30 action embeddings
+- After 30 steps, history has 30 action embeddings (mobile base + arm servo movements)
 - Model must process: current image + 30 history actions
 - This is where **KV cache grows** (more on this in Step 3)
 
@@ -169,8 +169,8 @@ Step 5: See arm at target
         └───────────────────┘
                 │
                 ▼
-          7D Action
-          (arm pose + gripper)
+        TurboPi Action Vector
+        (4-wheel control + 2-DOF camera pan-tilt)
 ```
 
 **What Each Component Does**:
@@ -189,7 +189,8 @@ Step 5: See arm at target
 
 3. **Action Head** (trainable):
    - Input: Processed embeddings from transformer
-   - Output: 7D action vector (arm position X, Y, Z + orientation + gripper)
+   - Output: Action vector for TurboPi (mobile base + arm servo commands)
+   - Example: [forward_speed, turn_speed, servo_1_angle, servo_2_angle, ...]
    - Size: Small linear layer
 
 ---
@@ -226,7 +227,7 @@ After reading, you should understand these:
 - [ ] **Action History**: Record of previous actions (why memory explodes with long histories)
 - [ ] **Vision Encoder**: Converts image to tokens (570 tokens, not 196k pixels)
 - [ ] **Transformer Decoder**: Processes visual tokens + action history (12 layers, 768 dims)
-- [ ] **Action Head**: Converts processed embeddings to 7D robot command
+- [ ] **Action Head**: Converts processed embeddings to TurboPi action command (mobile base + servo angles)
 - [ ] **Difference from LLM**: VLAs output actions, not text; sequences are bounded, not unbounded
 
 ---
@@ -254,11 +255,13 @@ Step 4: Transformer processes all tokens
 
 Step 5: Action head predicts next move
    → Input: Processed tokens
-   → Output: [0.5, 0.3, 0.1, -0.2, 0.8, 0.9, 0.0]
-            (move arm to X=0.5, Y=0.3, Z=0.1, with orientation and grip)
+   → Output: [0.6, -0.2, 0.1, 45, 20]
+            (forward velocity, strafe velocity, rotation, pan angle, tilt angle)
 
-Step 6: Robot executes action
-   → Robot moves arm to predicted position
+Step 6: TurboPi executes action
+   → Mecanum wheels: Move forward 0.6 m/s, strafe left 0.2 m/s, rotate slowly
+   → Pan-tilt servos: Pan 45°, tilt 20° to track object
+   → Result: TurboPi smoothly tracks object while maintaining vision
 ```
 
 **Question**: What happens if action history is longer (10 actions instead of 5)?  

@@ -48,7 +48,7 @@ Octo-Small (500M Parameters)
 │  Action Head (Linear Layer)                 │
 │  - <1M parameters                           │
 │  - Input: Processed embeddings              │
-│  - Output: 7D action vector                 │
+│  - Output: Action vector (variable dims)    │
 └─────────────────────────────────────────────┘
 ```
 
@@ -225,21 +225,27 @@ Aggregate (e.g., take last action token or average):
 - Result: 1 × 768 vector
 
 Linear projection:
-- 768 → 7 (output dimensions)
-- W: 768×7 matrix (learned)
-- Output: [x, y, z, θ_roll, θ_pitch, θ_yaw, grip]
+- 768 → N (output dimensions, depends on robot)
+- W: 768×N matrix (learned)
 
-Post-processing:
-- x, y, z: normalize to [-1, 1] (relative offsets)
-- Angles: normalize to [-π, π]
-- Grip: normalize to [0, 1]
+**For TurboPi specifically**:
+- Output: [forward_vel, strafe_vel, rotation, pan_angle, tilt_angle]
+- 5 dimensions for mecanum wheels (3) + pan-tilt camera (2)
+- forward_vel: [-1, 1] (backward to forward speed)
+- strafe_vel: [-1, 1] (left to right strafe)
+- rotation: [-1, 1] (counter-clockwise to clockwise)
+- pan_angle: [0, 180] (camera pan left-right)
+- tilt_angle: [-65, 65] (camera tilt up-down)
 ```
 
-**Why 7 dimensions?**
-- 3D position: x, y, z (arm tip location)
-- 3D orientation: roll, pitch, yaw (euler angles)
-- 1 Gripper: open/close strength (0-1)
-- Total: 7D action vector
+**Action Output Dimensions**:
+
+Octo is trained on multiple robot platforms, so the output varies:
+- **Mobile base robots** (like TurboPi): forward velocity, turning angle, servo angles
+- **Arm manipulators**: end-effector position (x, y, z), orientation (roll, pitch, yaw)
+- **Variable**: Depends on target robot's action space (mobile platform, arm, grippers, etc.)
+
+The important point: **Action head outputs numbers that directly control a robot**
 
 ---
 
@@ -280,12 +286,12 @@ Step 5: Transformer Decoder (12 layers)
 
 Step 6: Action Head
   Input: Last action token (or aggregated output) from layer 12
-  Linear projection: 768 → 7
-  Output: [x, y, z, roll, pitch, yaw, grip]
+  Linear projection: 768 → 5 (for TurboPi)
+  Output: [forward_vel, strafe_vel, rotation, pan_angle, tilt_angle]
   
-Step 7: Robot Executes
-  Move arm to predicted position and execute action
-  Action: Move to (0.25, 0.15, 0.95) with slight rotation and maintain grip (0.8)
+Step 7: TurboPi Executes
+  Execute predicted action on mecanum wheels + camera servos
+  Action: Move forward 0.6 m/s, strafe left slightly, pan camera 45°, tilt 20°
 ```
 
 ---
@@ -485,7 +491,7 @@ Can you answer these?
   **A**: 12 heads (64 dims each: 768÷12=64)
 
 - [ ] **Q7**: How many output dimensions for robot action?  
-  **A**: 7 (3 position + 3 orientation + 1 gripper)
+  **A**: Variable (depends on robot platform — TurboPi uses mobile base + servo angles, arms use xyz + orientation, etc.)
 
 - [ ] **Q8**: If action history is 50 steps, how many tokens enter transformer?  
   **A**: 570 (visual) + 50 (history) = 620 tokens
@@ -504,15 +510,15 @@ Can you answer these?
 - 500M parameters total
 - Vision Encoder: ViT-Base (86M, frozen)
 - Transformer Decoder: 12 layers, 768 hidden dim (400M)
-- Action Head: 7D output (linear layer, <1M)
+- Action Head: Variable output dimensions for different robots (linear layer, <1M)
 - Inference: 150-300ms on GPU, 300-500ms on Pi
 - KV Cache: Grows with action history length (THIS IS THE PROBLEM!)
 
 **Why These Choices**:
-- ViT-Base: Pre-trained vision knowledge
+- ViT-Base: Pre-trained vision knowledge from ImageNet
 - 12 layers: Proven depth for vision transformers
 - 768 dims: Good balance of expressiveness and efficiency
-- 7D action: Standard for robot control (xyz + rotation + gripper)
+- Variable output: Supports many robot platforms (arms, mobile bases, TurboPi, etc.)
 
 **Next Step**: Step 3 — KV Cache Growth Problem
 
