@@ -1,0 +1,135 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "turboquant-vla"
+version = "0.1.0"
+description = "TurboQuant KV cache compression for Vision-Language-Action models on Raspberry Pi 4B"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.9"
+authors = [
+    {name = "Suresh Gopalakrishnan", email = "suresh@example.com"}
+]
+keywords = ["turboquant", "vla", "quantization", "kv-cache", "robotics", "raspberry-pi"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+]
+
+dependencies = [
+    "torch>=2.0.0",
+    "transformers>=4.30.0",
+    "numpy>=1.21.0",
+    "pydantic>=2.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "black>=23.0.0",
+    "ruff>=0.0.275",
+    "mypy>=1.0.0",
+]
+octo = [
+    "octo>=0.1.0",  # When available
+]
+lerobot = [
+    "lerobot>=0.1.0",  # When available
+]
+onnx = [
+    "onnx>=1.13.0",
+    "onnxruntime>=1.14.0",
+]
+pi = [
+    "onnxruntime-rpi>=1.14.0",  # ARM-optimized ONNX Runtime
+]
+gpu = [
+    "torch-cuda",  # CUDA support for development
+]
+
+[project.urls]
+Homepage = "https://github.com/turboquant/vla"
+Documentation = "https://github.com/turboquant/vla#documentation"
+Repository = "https://github.com/turboquant/vla"
+"Bug Tracker" = "https://github.com/turboquant/vla/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["turboquant_kv", "octo_integration", "lerobot_integration"]
+
+[tool.black]
+line-length = 100
+target-version = ["py39", "py310", "py311"]
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+)/
+'''
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+select = ["E", "F", "I", "N", "W"]
+ignore = ["E501"]  # line too long (handled by black)
+exclude = [".git", "__pycache__", ".venv", "build", "dist"]
+
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = "-v --cov=turboquant_kv --cov-report=html --cov-report=term-missing"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+
+[tool.coverage.run]
+source = ["turboquant_kv"]
+omit = ["*/tests/*", "*/setup.py"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+]
+
+# UV environment configuration
+[tool.uv]
+name = "turboquant-vla-dev"
+python = "3.11"
+index-url = "https://pypi.org/simple"
+
+[tool.uv.sources]
+# Add local package sources if needed
+# lerobot = {path = "packages/lerobot"}
+
+# Development settings
+[tool.uv.env]
+# Use this to activate with: uv run --env-file .env.turboquant-vla-dev
+# Or create a shell: uv venv turboquant-vla-dev && source turboquant-vla-dev/bin/activate
