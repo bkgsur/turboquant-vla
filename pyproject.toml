@@ -121,15 +121,9 @@ exclude_lines = [
 
 # UV environment configuration
 [tool.uv]
-name = "turboquant-vla-dev"
-python = "3.11"
 index-url = "https://pypi.org/simple"
 
 [tool.uv.sources]
 # Add local package sources if needed
 # lerobot = {path = "packages/lerobot"}
 
-# Development settings
-[tool.uv.env]
-# Use this to activate with: uv run --env-file .env.turboquant-vla-dev
-# Or create a shell: uv venv turboquant-vla-dev && source turboquant-vla-dev/bin/activate
